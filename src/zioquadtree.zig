@@ -430,3 +430,38 @@ test "QuadNode insert many clustered items" {
     }
     try std.testing.expectEqual(@as(usize, 8), node.count());
 }
+
+test "QuadNode clear and reinsert" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+    var node = try QuadNode.init(std.testing.allocator, bounds, 6, 0);
+    defer node.deinit();
+
+    _ = try node.insert(.{ .x = 10, .y = 10, .w = 5, .h = 5 }, 1);
+    _ = try node.insert(.{ .x = 50, .y = 50, .w = 5, .h = 5 }, 2);
+    try std.testing.expectEqual(@as(usize, 2), node.count());
+
+    node.clear();
+    try std.testing.expectEqual(@as(usize, 0), node.count());
+
+    _ = try node.insert(.{ .x = 80, .y = 80, .w = 5, .h = 5 }, 3);
+    try std.testing.expectEqual(@as(usize, 1), node.count());
+}
+
+test "Bounds large values" {
+    const b = Bounds{ .x = -1000, .y = -1000, .w = 2000, .h = 2000 };
+    try std.testing.expect(b.contains(0, 0));
+    try std.testing.expect(b.contains(-500, 500));
+    try std.testing.expect(!b.contains(2000, 0));
+}
+
+test "QuadNode items at boundaries" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+    var node = try QuadNode.init(std.testing.allocator, bounds, 6, 0);
+    defer node.deinit();
+
+    // Item exactly at center
+    _ = try node.insert(.{ .x = 50, .y = 50, .w = 1, .h = 1 }, 1);
+    // Item at edge
+    _ = try node.insert(.{ .x = 0, .y = 0, .w = 1, .h = 1 }, 2);
+    try std.testing.expectEqual(@as(usize, 2), node.count());
+}
