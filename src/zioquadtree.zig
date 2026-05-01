@@ -270,3 +270,41 @@ test "Bounds intersects" {
     try std.testing.expect(a.intersects(b));
     try std.testing.expect(!a.intersects(c));
 }
+
+test "Bounds self-intersects" {
+    const a = Bounds{ .x = 0, .y = 0, .w = 10, .h = 10 };
+    try std.testing.expect(a.intersects(a));
+}
+
+test "Bounds contains edge" {
+    const b = Bounds{ .x = 0, .y = 0, .w = 10, .h = 10 };
+    try std.testing.expect(b.contains(0, 0)); // top-left corner
+    try std.testing.expect(!b.contains(10, 10)); // outside (exclusive)
+}
+
+test "QuadNode max depth prevents split" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+
+    // max_depth = 0 means no splitting ever
+    var node = try QuadNode.init(std.testing.allocator, bounds, 0, 0);
+    defer node.deinit();
+
+    for (0..20) |i| {
+        _ = try node.insert(.{ .x = @floatFromInt(i * 3), .y = @floatFromInt(i * 3), .w = 2, .h = 2 }, @intCast(i));
+    }
+    try std.testing.expect(node.children == null);
+}
+
+test "QuadNode partial overlap query" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+
+    var node = try QuadNode.init(std.testing.allocator, bounds, 6, 0);
+    defer node.deinit();
+
+    _ = try node.insert(.{ .x = 45, .y = 45, .w = 10, .h = 10 }, 1); // straddles center
+
+    var result: [64]Item = undefined;
+    var result_count: usize = 0;
+    node.query(.{ .x = 48, .y = 0, .w = 10, .h = 100 }, &result, &result_count);
+    try std.testing.expectEqual(@as(usize, 1), result_count);
+}
