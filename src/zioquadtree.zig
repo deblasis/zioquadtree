@@ -520,3 +520,22 @@ test "Bounds non-overlapping regions" {
     const b = Bounds{ .x = 20, .y = 20, .w = 10, .h = 10 };
     try std.testing.expect(!a.intersects(b));
 }
+
+test "QuadNode count never decreases without clear" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+    var node = try QuadNode.init(std.testing.allocator, bounds, 4, 0);
+    defer node.deinit();
+
+    _ = try node.insert(.{ .x = 10, .y = 10, .w = 5, .h = 5 }, 1);
+    const c1 = node.count();
+    _ = try node.insert(.{ .x = 50, .y = 50, .w = 5, .h = 5 }, 2);
+    const c2 = node.count();
+    try std.testing.expect(c2 >= c1);
+}
+
+test "Bounds intersects is reflexive and symmetric" {
+    const a = Bounds{ .x = 0, .y = 0, .w = 10, .h = 10 };
+    const b = Bounds{ .x = 5, .y = 5, .w = 10, .h = 10 };
+    try std.testing.expect(a.intersects(a)); // reflexive
+    try std.testing.expectEqual(a.intersects(b), b.intersects(a)); // symmetric
+}
