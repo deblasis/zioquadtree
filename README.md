@@ -35,6 +35,13 @@ zig build test          # Run 37 tests
 zig build run-example   # Run example
 ```
 
+## Example output
+
+```
+$ zig build run-example
+Total items: 3
+```
+
 ## API
 
 ### Types

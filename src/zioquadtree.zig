@@ -567,3 +567,13 @@ test "QuadNode insert at same position" {
     _ = try node.insert(.{ .x = 50, .y = 50, .w = 5, .h = 5 }, 2);
     try std.testing.expectEqual(@as(usize, 2), node.count());
 }
+
+test "example: 3 items in tree" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+    var node = try QuadNode.init(std.testing.allocator, bounds, 6, 0);
+    defer node.deinit();
+    _ = try node.insert(.{ .x = 10, .y = 10, .w = 5, .h = 5 }, 1);
+    _ = try node.insert(.{ .x = 50, .y = 50, .w = 5, .h = 5 }, 2);
+    _ = try node.insert(.{ .x = 80, .y = 80, .w = 5, .h = 5 }, 3);
+    try std.testing.expectEqual(@as(usize, 3), node.count());
+}
