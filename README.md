@@ -40,6 +40,10 @@ zig build run-example   # Run example
 ```
 $ zig build run-example
 Total items: 3
+Query near (100,200): 2 items
+  item data=1 at (100,200)
+  item data=3 at (105,195)
+After clear: 0 items
 ```
 
 ## API
