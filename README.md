@@ -31,7 +31,7 @@ tree.clear();
 ```
 
 ```bash
-zig build test          # Run 37 tests
+zig build test          # Run 40 tests
 zig build run-example   # Run example
 ```
 
