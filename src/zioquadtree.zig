@@ -358,3 +358,19 @@ test "QuadNode query outside region" {
     node.query(.{ .x = 50, .y = 50, .w = 10, .h = 10 }, &result, &result_count);
     try std.testing.expectEqual(@as(usize, 0), result_count);
 }
+
+test "Bounds center calculation" {
+    const b = Bounds{ .x = 10, .y = 20, .w = 30, .h = 40 };
+    try std.testing.expectEqual(@as(f32, 25), b.centerX());
+    try std.testing.expectEqual(@as(f32, 40), b.centerY());
+}
+
+test "QuadNode insert at corner" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+    var node = try QuadNode.init(std.testing.allocator, bounds, 6, 0);
+    defer node.deinit();
+
+    // Item at exact corner
+    _ = try node.insert(.{ .x = 0, .y = 0, .w = 1, .h = 1 }, 1);
+    try std.testing.expectEqual(@as(usize, 1), node.count());
+}
