@@ -483,3 +483,8 @@ test "QuadNode query with small region" {
     node.query(.{ .x = 9, .y = 9, .w = 7, .h = 7 }, &result, &result_count);
     try std.testing.expectEqual(@as(usize, 1), result_count);
 }
+
+test "Bounds contains center point" {
+    const b = Bounds{ .x = 0, .y = 0, .w = 10, .h = 10 };
+    try std.testing.expect(b.contains(5, 5));
+}
