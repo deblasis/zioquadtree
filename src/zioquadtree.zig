@@ -488,3 +488,13 @@ test "Bounds contains center point" {
     const b = Bounds{ .x = 0, .y = 0, .w = 10, .h = 10 };
     try std.testing.expect(b.contains(5, 5));
 }
+
+test "QuadNode insert and count matches" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 200, .h = 200 };
+    var node = try QuadNode.init(std.testing.allocator, bounds, 6, 0);
+    defer node.deinit();
+    for (0..8) |i| {
+        _ = try node.insert(.{ .x = @as(f32, @floatFromInt(i)) * 23.7, .y = @as(f32, @floatFromInt(i)) * 23.7, .w = 5, .h = 5 }, @intCast(i));
+    }
+    try std.testing.expect(node.count() >= 8);
+}
