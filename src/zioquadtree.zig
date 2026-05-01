@@ -465,3 +465,21 @@ test "QuadNode items at boundaries" {
     _ = try node.insert(.{ .x = 0, .y = 0, .w = 1, .h = 1 }, 2);
     try std.testing.expectEqual(@as(usize, 2), node.count());
 }
+
+test "Bounds intersects with itself" {
+    const b = Bounds{ .x = 5, .y = 5, .w = 10, .h = 10 };
+    try std.testing.expect(b.intersects(b));
+}
+
+test "QuadNode query with small region" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+    var node = try QuadNode.init(std.testing.allocator, bounds, 6, 0);
+    defer node.deinit();
+    _ = try node.insert(.{ .x = 10, .y = 10, .w = 5, .h = 5 }, 1);
+    _ = try node.insert(.{ .x = 50, .y = 50, .w = 5, .h = 5 }, 2);
+
+    var result: [64]Item = undefined;
+    var result_count: usize = 0;
+    node.query(.{ .x = 9, .y = 9, .w = 7, .h = 7 }, &result, &result_count);
+    try std.testing.expectEqual(@as(usize, 1), result_count);
+}
