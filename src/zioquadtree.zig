@@ -1,0 +1,272 @@
+//! Quadtree for 2D spatial partitioning.
+//!
+//! Efficient broad-phase collision detection, frustum culling,
+//! and spatial queries. Insert/query/remove AABB items.
+
+const std = @import("std");
+
+/// Default max depth to prevent infinite recursion.
+pub const DEFAULT_MAX_DEPTH = 6;
+
+/// Axis-aligned bounding box for quadtree regions.
+pub const Bounds = struct {
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+
+    pub fn contains(b: Bounds, px: f32, py: f32) bool {
+        return px >= b.x and px < b.x + b.w and py >= b.y and py < b.y + b.h;
+    }
+
+    pub fn intersects(a: Bounds, b: Bounds) bool {
+        return a.x < b.x + b.w and a.x + a.w > b.x and
+               a.y < b.y + b.h and a.y + a.h > b.y;
+    }
+
+    pub fn centerX(b: Bounds) f32 { return b.x + b.w / 2; }
+    pub fn centerY(b: Bounds) f32 { return b.y + b.h / 2; }
+};
+
+/// An item in the quadtree.
+pub const Item = struct {
+    bounds: Bounds,
+    data: u32,
+};
+
+const MAX_NODE_ITEMS: usize = 8;
+
+/// A quadtree node. Uses fixed-capacity arrays.
+pub const QuadNode = struct {
+    bounds: Bounds,
+    items: [MAX_NODE_ITEMS]Item,
+    item_count: usize,
+    children: ?*[4]*QuadNode,
+    max_depth: u32,
+    depth: u32,
+    allocator: std.mem.Allocator,
+
+    pub fn init(allocator: std.mem.Allocator, bounds: Bounds, max_depth: u32, depth: u32) !*QuadNode {
+        const node = try allocator.create(QuadNode);
+        node.* = .{
+            .bounds = bounds,
+            .items = undefined,
+            .item_count = 0,
+            .children = null,
+            .max_depth = max_depth,
+            .depth = depth,
+            .allocator = allocator,
+        };
+        return node;
+    }
+
+    pub fn deinit(self: *QuadNode) void {
+        if (self.children) |ch| {
+            for (ch) |child| {
+                child.deinit();
+            }
+            self.allocator.destroy(ch);
+        }
+        self.allocator.destroy(self);
+    }
+
+    /// Insert an item. Returns false if item is outside bounds.
+    pub fn insert(self: *QuadNode, bounds: Bounds, data: u32) !bool {
+        if (!self.bounds.intersects(bounds)) return false;
+
+        if (self.children) |ch| {
+            for (ch) |child| {
+                _ = try child.insert(bounds, data);
+            }
+            return true;
+        }
+
+        if (self.item_count < MAX_NODE_ITEMS) {
+            self.items[self.item_count] = .{ .bounds = bounds, .data = data };
+            self.item_count += 1;
+        }
+
+        if (self.item_count >= MAX_NODE_ITEMS and self.depth < self.max_depth) {
+            try self.split();
+        }
+        return true;
+    }
+
+    /// Query all items overlapping the given bounds. Caller provides result buffer.
+    pub fn query(self: *const QuadNode, region: Bounds, result: []Item, result_count: *usize) void {
+        if (!self.bounds.intersects(region)) return;
+
+        for (self.items[0..self.item_count]) |item| {
+            if (item.bounds.intersects(region)) {
+                if (result_count.* < result.len) {
+                    result[result_count.*] = item;
+                    result_count.* += 1;
+                }
+            }
+        }
+
+        if (self.children) |ch| {
+            for (ch) |child| {
+                child.query(region, result, result_count);
+            }
+        }
+    }
+
+    /// Count all items in the tree.
+    pub fn count(self: *const QuadNode) usize {
+        var n = self.item_count;
+        if (self.children) |ch| {
+            for (ch) |child| {
+                n += child.count();
+            }
+        }
+        return n;
+    }
+
+    /// Clear all items and children.
+    pub fn clear(self: *QuadNode) void {
+        self.item_count = 0;
+        if (self.children) |ch| {
+            for (ch) |child| {
+                child.deinit();
+            }
+            self.allocator.destroy(ch);
+            self.children = null;
+        }
+    }
+
+    fn split(self: *QuadNode) !void {
+        if (self.children != null) return;
+
+        const hw = self.bounds.w / 2;
+        const hh = self.bounds.h / 2;
+        const cx = self.bounds.centerX();
+        const cy = self.bounds.centerY();
+        const next_depth = self.depth + 1;
+
+        const quadrants = [4]Bounds{
+            .{ .x = self.bounds.x, .y = self.bounds.y, .w = hw, .h = hh },
+            .{ .x = cx, .y = self.bounds.y, .w = hw, .h = hh },
+            .{ .x = self.bounds.x, .y = cy, .w = hw, .h = hh },
+            .{ .x = cx, .y = cy, .w = hw, .h = hh },
+        };
+
+        const children = try self.allocator.create([4]*QuadNode);
+        for (children, 0..) |_, i| {
+            children[i] = try QuadNode.init(self.allocator, quadrants[i], self.max_depth, next_depth);
+        }
+        self.children = children;
+
+        const old_count = self.item_count;
+        self.item_count = 0;
+        for (self.items[0..old_count]) |item| {
+            for (children) |child| {
+                if (child.bounds.intersects(item.bounds)) {
+                    if (child.item_count < MAX_NODE_ITEMS) {
+                        child.items[child.item_count] = item;
+                        child.item_count += 1;
+                    }
+                }
+            }
+        }
+    }
+};
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+test "QuadNode insert and query" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+
+    var node = try QuadNode.init(std.testing.allocator, bounds, 6, 0);
+    defer node.deinit();
+
+    _ = try node.insert(.{ .x = 10, .y = 10, .w = 5, .h = 5 }, 1);
+    _ = try node.insert(.{ .x = 50, .y = 50, .w = 5, .h = 5 }, 2);
+
+    var result: [64]Item = undefined;
+    var result_count: usize = 0;
+    node.query(.{ .x = 0, .y = 0, .w = 20, .h = 20 }, &result, &result_count);
+    try std.testing.expectEqual(@as(usize, 1), result_count);
+    try std.testing.expectEqual(@as(u32, 1), result[0].data);
+}
+
+test "QuadNode insert outside bounds returns false" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+
+    var node = try QuadNode.init(std.testing.allocator, bounds, 6, 0);
+    defer node.deinit();
+
+    const ok = try node.insert(.{ .x = 200, .y = 200, .w = 5, .h = 5 }, 1);
+    try std.testing.expect(!ok);
+}
+
+test "QuadNode splits on overflow" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+
+    var node = try QuadNode.init(std.testing.allocator, bounds, 6, 0);
+    defer node.deinit();
+
+    for (0..10) |i| {
+        _ = try node.insert(.{ .x = @floatFromInt(i * 5), .y = @floatFromInt(i * 5), .w = 2, .h = 2 }, @intCast(i));
+    }
+
+    try std.testing.expect(node.children != null);
+}
+
+test "QuadNode query all" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+
+    var node = try QuadNode.init(std.testing.allocator, bounds, 6, 0);
+    defer node.deinit();
+
+    for (0..8) |i| {
+        _ = try node.insert(.{ .x = @floatFromInt(i * 10), .y = 0, .w = 2, .h = 2 }, @intCast(i));
+    }
+
+    var result: [64]Item = undefined;
+    var result_count: usize = 0;
+    node.query(bounds, &result, &result_count);
+    try std.testing.expectEqual(@as(usize, 8), result_count);
+}
+
+test "QuadNode count" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+
+    var node = try QuadNode.init(std.testing.allocator, bounds, 6, 0);
+    defer node.deinit();
+
+    for (0..8) |i| {
+        _ = try node.insert(.{ .x = @floatFromInt(i * 10), .y = 0, .w = 2, .h = 2 }, @intCast(i));
+    }
+    try std.testing.expectEqual(@as(usize, 8), node.count());
+}
+
+test "QuadNode clear" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+
+    var node = try QuadNode.init(std.testing.allocator, bounds, 6, 0);
+    defer node.deinit();
+
+    for (0..10) |i| {
+        _ = try node.insert(.{ .x = @floatFromInt(i * 10), .y = 0, .w = 2, .h = 2 }, @intCast(i));
+    }
+    node.clear();
+    try std.testing.expectEqual(@as(usize, 0), node.count());
+    try std.testing.expect(node.children == null);
+}
+
+test "Bounds contains" {
+    const b = Bounds{ .x = 10, .y = 10, .w = 20, .h = 20 };
+    try std.testing.expect(b.contains(15, 15));
+    try std.testing.expect(!b.contains(5, 5));
+}
+
+test "Bounds intersects" {
+    const a = Bounds{ .x = 0, .y = 0, .w = 10, .h = 10 };
+    const b = Bounds{ .x = 5, .y = 5, .w = 10, .h = 10 };
+    const c = Bounds{ .x = 20, .y = 20, .w = 5, .h = 5 };
+    try std.testing.expect(a.intersects(b));
+    try std.testing.expect(!a.intersects(c));
+}
