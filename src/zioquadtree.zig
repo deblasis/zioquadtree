@@ -397,3 +397,36 @@ test "Bounds contains on edge" {
     // Right edge is excluded
     try std.testing.expect(!b.contains(10, 5));
 }
+
+test "QuadNode single item query" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+    var node = try QuadNode.init(std.testing.allocator, bounds, 6, 0);
+    defer node.deinit();
+
+    _ = try node.insert(.{ .x = 50, .y = 50, .w = 5, .h = 5 }, 99);
+
+    var result: [64]Item = undefined;
+    var result_count: usize = 0;
+    node.query(.{ .x = 0, .y = 0, .w = 100, .h = 100 }, &result, &result_count);
+    try std.testing.expectEqual(@as(usize, 1), result_count);
+    try std.testing.expectEqual(@as(u32, 99), result[0].data);
+}
+
+test "Bounds non-intersecting adjacent" {
+    const a = Bounds{ .x = 0, .y = 0, .w = 10, .h = 10 };
+    const b = Bounds{ .x = 10, .y = 10, .w = 10, .h = 10 };
+    // a.maxX == b.x and a.maxY == b.y, but strict inequality means no overlap
+    try std.testing.expect(!a.intersects(b));
+}
+
+test "QuadNode insert many clustered items" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+    var node = try QuadNode.init(std.testing.allocator, bounds, 6, 0);
+    defer node.deinit();
+
+    // All items clustered in one corner
+    for (0..8) |i| {
+        _ = try node.insert(.{ .x = 1, .y = @floatFromInt(i), .w = 2, .h = 1 }, @intCast(i));
+    }
+    try std.testing.expectEqual(@as(usize, 8), node.count());
+}
