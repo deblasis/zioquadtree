@@ -374,3 +374,26 @@ test "QuadNode insert at corner" {
     _ = try node.insert(.{ .x = 0, .y = 0, .w = 1, .h = 1 }, 1);
     try std.testing.expectEqual(@as(usize, 1), node.count());
 }
+
+test "QuadNode overlapping items" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+    var node = try QuadNode.init(std.testing.allocator, bounds, 6, 0);
+    defer node.deinit();
+
+    // Two items at same position
+    _ = try node.insert(.{ .x = 10, .y = 10, .w = 5, .h = 5 }, 1);
+    _ = try node.insert(.{ .x = 10, .y = 10, .w = 5, .h = 5 }, 2);
+
+    var result: [64]Item = undefined;
+    var result_count: usize = 0;
+    node.query(.{ .x = 5, .y = 5, .w = 20, .h = 20 }, &result, &result_count);
+    try std.testing.expectEqual(@as(usize, 2), result_count);
+}
+
+test "Bounds contains on edge" {
+    const b = Bounds{ .x = 0, .y = 0, .w = 10, .h = 10 };
+    // Left edge is included
+    try std.testing.expect(b.contains(0, 5));
+    // Right edge is excluded
+    try std.testing.expect(!b.contains(10, 5));
+}
