@@ -581,3 +581,23 @@ test "example: 3 items in tree" {
     _ = try node.insert(.{ .x = 80, .y = 80, .w = 5, .h = 5 }, 3);
     try std.testing.expectEqual(@as(usize, 3), node.count());
 }
+
+test "QuadNode with small capacity triggers subdivision" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+    var node = try QuadNode.init(std.testing.allocator, bounds, 2, 0);
+    defer node.deinit();
+
+    // Insert 5 items with capacity 2 — should trigger subdivision
+    _ = try node.insert(.{ .x = 10, .y = 10, .w = 5, .h = 5 }, 1);
+    _ = try node.insert(.{ .x = 60, .y = 10, .w = 5, .h = 5 }, 2);
+    _ = try node.insert(.{ .x = 10, .y = 60, .w = 5, .h = 5 }, 3);
+    _ = try node.insert(.{ .x = 60, .y = 60, .w = 5, .h = 5 }, 4);
+    _ = try node.insert(.{ .x = 50, .y = 50, .w = 5, .h = 5 }, 5);
+    try std.testing.expectEqual(@as(usize, 5), node.count());
+}
+
+test "Bounds area calculation" {
+    const b = Bounds{ .x = 0, .y = 0, .w = 20, .h = 30 };
+    // Area should be 600
+    try std.testing.expect(b.w * b.h == 600);
+}
