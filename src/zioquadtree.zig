@@ -558,3 +558,12 @@ test "QuadNode clear on empty tree" {
     node.clear(); // should not crash
     try std.testing.expectEqual(@as(usize, 0), node.count());
 }
+
+test "QuadNode insert at same position" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+    var node = try QuadNode.init(std.testing.allocator, bounds, 4, 0);
+    defer node.deinit();
+    _ = try node.insert(.{ .x = 50, .y = 50, .w = 5, .h = 5 }, 1);
+    _ = try node.insert(.{ .x = 50, .y = 50, .w = 5, .h = 5 }, 2);
+    try std.testing.expectEqual(@as(usize, 2), node.count());
+}
