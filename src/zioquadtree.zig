@@ -601,3 +601,25 @@ test "Bounds area calculation" {
     // Area should be 600
     try std.testing.expect(b.w * b.h == 600);
 }
+
+test "game entity query within camera view" {
+    const world = Bounds{ .x = -500, .y = -500, .w = 1000, .h = 1000 };
+    var tree = try QuadNode.init(std.testing.allocator, world, 8, 0);
+    defer tree.deinit();
+
+    // Place 20 entities
+    for (0..20) |i| {
+        const fi: f32 = @floatFromInt(i);
+        const fx = fi * 50 - 500;
+        _ = try tree.insert(.{ .x = fx, .y = 0, .w = 10, .h = 10 }, @intCast(i));
+    }
+
+    // Camera sees only center portion
+    const camera = Bounds{ .x = -100, .y = -50, .w = 200, .h = 100 };
+    var result: [64]Item = undefined;
+    var count: usize = 0;
+    tree.query(camera, &result, &count);
+    // Should find ~4 entities (indices 8-11)
+    try std.testing.expect(count >= 2);
+    try std.testing.expect(count <= 8);
+}
