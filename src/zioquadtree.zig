@@ -21,11 +21,15 @@ pub const Bounds = struct {
 
     pub fn intersects(a: Bounds, b: Bounds) bool {
         return a.x < b.x + b.w and a.x + a.w > b.x and
-               a.y < b.y + b.h and a.y + a.h > b.y;
+            a.y < b.y + b.h and a.y + a.h > b.y;
     }
 
-    pub fn centerX(b: Bounds) f32 { return b.x + b.w / 2; }
-    pub fn centerY(b: Bounds) f32 { return b.y + b.h / 2; }
+    pub fn centerX(b: Bounds) f32 {
+        return b.x + b.w / 2;
+    }
+    pub fn centerY(b: Bounds) f32 {
+        return b.y + b.h / 2;
+    }
 };
 
 /// An item in the quadtree.
