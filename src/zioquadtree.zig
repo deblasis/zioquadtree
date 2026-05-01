@@ -498,3 +498,25 @@ test "QuadNode insert and count matches" {
     }
     try std.testing.expect(node.count() >= 8);
 }
+
+test "QuadNode query finds items in overlapping regions" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+    var node = try QuadNode.init(std.testing.allocator, bounds, 4, 0);
+    defer node.deinit();
+
+    _ = try node.insert(.{ .x = 25, .y = 25, .w = 10, .h = 10 }, 1);
+    _ = try node.insert(.{ .x = 75, .y = 75, .w = 10, .h = 10 }, 2);
+    _ = try node.insert(.{ .x = 25, .y = 75, .w = 10, .h = 10 }, 3);
+
+    // Query overlapping center should find all 3
+    var result: [64]Item = undefined;
+    var count: usize = 0;
+    node.query(.{ .x = 0, .y = 0, .w = 100, .h = 100 }, &result, &count);
+    try std.testing.expect(count >= 3);
+}
+
+test "Bounds non-overlapping regions" {
+    const a = Bounds{ .x = 0, .y = 0, .w = 10, .h = 10 };
+    const b = Bounds{ .x = 20, .y = 20, .w = 10, .h = 10 };
+    try std.testing.expect(!a.intersects(b));
+}
