@@ -308,3 +308,53 @@ test "QuadNode partial overlap query" {
     node.query(.{ .x = 48, .y = 0, .w = 10, .h = 100 }, &result, &result_count);
     try std.testing.expectEqual(@as(usize, 1), result_count);
 }
+
+test "QuadNode nested splits" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+
+    var node = try QuadNode.init(std.testing.allocator, bounds, 4, 0);
+    defer node.deinit();
+
+    // Insert enough items to trigger multiple splits
+    for (0..30) |i| {
+        _ = try node.insert(.{ .x = @as(f32, @floatFromInt(i)) * 3.1, .y = @as(f32, @floatFromInt(i)) * 3.1, .w = 1, .h = 1 }, @intCast(i));
+    }
+    try std.testing.expect(node.children != null);
+    try std.testing.expect(node.count() >= 25); // some items may be on boundaries
+}
+
+test "Bounds zero size" {
+    const b = Bounds{ .x = 5, .y = 5, .w = 0, .h = 0 };
+    // Zero-width bounds don't contain anything since x < x+w fails
+    try std.testing.expect(!b.contains(5, 5));
+    // Zero-size bounds don't intersect with anything that doesn't overlap exactly
+    const other = Bounds{ .x = 0, .y = 0, .w = 10, .h = 10 };
+    // b.x(5) < other.maxX(10) and b.maxX(5) > other.x(0) => true
+    try std.testing.expect(other.intersects(b));
+}
+
+test "QuadNode empty query" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+
+    var node = try QuadNode.init(std.testing.allocator, bounds, 6, 0);
+    defer node.deinit();
+
+    var result: [64]Item = undefined;
+    var result_count: usize = 0;
+    node.query(bounds, &result, &result_count);
+    try std.testing.expectEqual(@as(usize, 0), result_count);
+}
+
+test "QuadNode query outside region" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+
+    var node = try QuadNode.init(std.testing.allocator, bounds, 6, 0);
+    defer node.deinit();
+
+    _ = try node.insert(.{ .x = 10, .y = 10, .w = 5, .h = 5 }, 1);
+
+    var result: [64]Item = undefined;
+    var result_count: usize = 0;
+    node.query(.{ .x = 50, .y = 50, .w = 10, .h = 10 }, &result, &result_count);
+    try std.testing.expectEqual(@as(usize, 0), result_count);
+}
