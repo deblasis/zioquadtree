@@ -539,3 +539,22 @@ test "Bounds intersects is reflexive and symmetric" {
     try std.testing.expect(a.intersects(a)); // reflexive
     try std.testing.expectEqual(a.intersects(b), b.intersects(a)); // symmetric
 }
+
+test "QuadNode query empty tree returns zero" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+    var node = try QuadNode.init(std.testing.allocator, bounds, 4, 0);
+    defer node.deinit();
+
+    var result: [64]Item = undefined;
+    var count: usize = 0;
+    node.query(.{ .x = 0, .y = 0, .w = 100, .h = 100 }, &result, &count);
+    try std.testing.expectEqual(@as(usize, 0), count);
+}
+
+test "QuadNode clear on empty tree" {
+    const bounds = Bounds{ .x = 0, .y = 0, .w = 100, .h = 100 };
+    var node = try QuadNode.init(std.testing.allocator, bounds, 4, 0);
+    defer node.deinit();
+    node.clear(); // should not crash
+    try std.testing.expectEqual(@as(usize, 0), node.count());
+}
