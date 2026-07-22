@@ -10,23 +10,32 @@ pub const DEFAULT_MAX_DEPTH = 6;
 
 /// Axis-aligned bounding box for quadtree regions.
 pub const Bounds = struct {
+    /// Left edge (minimum x).
     x: f32,
+    /// Top edge (minimum y).
     y: f32,
+    /// Width; the box spans `x` to `x + w`.
     w: f32,
+    /// Height; the box spans `y` to `y + h`.
     h: f32,
 
+    /// Whether point (`px`, `py`) lies inside the box. The left and top edges
+    /// are inclusive; the right and bottom edges are exclusive.
     pub fn contains(b: Bounds, px: f32, py: f32) bool {
         return px >= b.x and px < b.x + b.w and py >= b.y and py < b.y + b.h;
     }
 
+    /// Whether two boxes overlap. Edge-touching boxes do not intersect.
     pub fn intersects(a: Bounds, b: Bounds) bool {
         return a.x < b.x + b.w and a.x + a.w > b.x and
             a.y < b.y + b.h and a.y + a.h > b.y;
     }
 
+    /// The x coordinate of the box center.
     pub fn centerX(b: Bounds) f32 {
         return b.x + b.w / 2;
     }
+    /// The y coordinate of the box center.
     pub fn centerY(b: Bounds) f32 {
         return b.y + b.h / 2;
     }
@@ -34,7 +43,9 @@ pub const Bounds = struct {
 
 /// An item in the quadtree.
 pub const Item = struct {
+    /// The item's axis-aligned bounding box.
     bounds: Bounds,
+    /// Opaque caller payload (e.g. an entity id).
     data: u32,
 };
 
@@ -42,14 +53,23 @@ const MAX_NODE_ITEMS: usize = 8;
 
 /// A quadtree node. Uses fixed-capacity arrays.
 pub const QuadNode = struct {
+    /// Region this node covers.
     bounds: Bounds,
+    /// Items held directly at this node (before it subdivides).
     items: [MAX_NODE_ITEMS]Item,
+    /// Number of valid entries in `items`.
     item_count: usize,
+    /// Four child quadrants once subdivided, or null while this is a leaf.
     children: ?*[4]*QuadNode,
+    /// Maximum subdivision depth allowed from the root.
     max_depth: u32,
+    /// This node's depth below the root (0 at the root).
     depth: u32,
+    /// Allocator used for child nodes and freeing on deinit.
     allocator: std.mem.Allocator,
 
+    /// Allocate a node covering `bounds` at `depth`, capped at `max_depth`
+    /// subdivisions. Free it (and its subtree) with `deinit`.
     pub fn init(allocator: std.mem.Allocator, bounds: Bounds, max_depth: u32, depth: u32) !*QuadNode {
         const node = try allocator.create(QuadNode);
         node.* = .{
@@ -64,6 +84,7 @@ pub const QuadNode = struct {
         return node;
     }
 
+    /// Free this node and its entire subtree.
     pub fn deinit(self: *QuadNode) void {
         if (self.children) |ch| {
             for (ch) |child| {
